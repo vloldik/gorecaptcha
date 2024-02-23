@@ -23,52 +23,54 @@ func (err InvalidTokenError) Error() string {
 	return fmt.Sprintf("invalid captcha token error, reason: %s", err.Reason)
 }
 
-func CreateAssessment(context context.Context, clientOption option.ClientOption, projectID, recaptchaKey, token string) (assessment *recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment, err error) {
+type CaptchaAssessmentService struct {
+	ClientOpton             option.ClientOption
+	ProjectId, RecaptchaKey string
+}
 
-	ctx := context
-	client, err := recaptcha.NewService(ctx, clientOption)
+func NewAssessmentService(clientOption option.ClientOption, projectId, recaptchaKey string) *CaptchaAssessmentService {
+	return &CaptchaAssessmentService{ClientOpton: clientOption, ProjectId: projectId, RecaptchaKey: recaptchaKey}
+}
 
+func (service CaptchaAssessmentService) CreateAssessment(context context.Context, token string) (*recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment, error) {
+	client, err := recaptcha.NewService(context, service.ClientOpton)
 	if err != nil {
-		return
+		return nil, err
 	}
-
 	event := &recaptcha.GoogleCloudRecaptchaenterpriseV1Event{
 		Token:   token,
-		SiteKey: recaptchaKey,
+		SiteKey: service.RecaptchaKey,
 	}
-
-	newAssesment := &recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment{
+	assessment := &recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment{
 		Event: event,
 	}
-
-	call := client.Projects.Assessments.Create(fmt.Sprintf("projects/%s", projectID), newAssesment)
-
+	call := client.Projects.Assessments.Create(fmt.Sprintf("projects/%s", service.ProjectId), assessment)
 	return call.Do()
 }
 
-func ValidateAssesment(assesment *recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment, eventAction string, minRiskScore float64) (err error) {
+func (service CaptchaAssessmentService) ValidateAssessment(assessment *recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment, eventAction string, minRiskScore float64) (err error) {
 	if minRiskScore > 1 || minRiskScore < 0 {
 		return ErrInvalidMinRisk
 	}
-	if !assesment.TokenProperties.Valid {
-		return InvalidTokenError{Reason: assesment.TokenProperties.InvalidReason}
+	if !assessment.TokenProperties.Valid {
+		return InvalidTokenError{Reason: assessment.TokenProperties.InvalidReason}
 	}
-	if eventAction != assesment.TokenProperties.Action {
+	if eventAction != assessment.TokenProperties.Action {
 		return ErrInvalidAction
 	}
-	if assesment.RiskAnalysis.Score < minRiskScore {
+	if assessment.RiskAnalysis.Score < minRiskScore {
 		return ErrLowScore
 	}
 	return
 }
 
-func CreateAndValidateAssesment(context context.Context, clientOption option.ClientOption, projectID, recaptchaKey, token,
+func (service CaptchaAssessmentService) CreateAndValidateAssessment(context context.Context, token,
 	recaptchaAction string, minRiskScore float64) (assessment *recaptcha.GoogleCloudRecaptchaenterpriseV1Assessment, err error) {
 
-	assessment, err = CreateAssessment(context, clientOption, projectID, recaptchaKey, token)
+	assessment, err = service.CreateAssessment(context, token)
 	if err != nil {
 		return
 	}
-	err = ValidateAssesment(assessment, recaptchaAction, minRiskScore)
+	err = service.ValidateAssessment(assessment, recaptchaAction, minRiskScore)
 	return
 }
