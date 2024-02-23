@@ -8,7 +8,19 @@ go get github.com/vloldik/gorecaptcha
 
 ### Usage
 ```go
-assessment, err := gorecaptcha.CreateAndValidateAssesment(context.Background(), option.WithAPIKey("<api-key>"), appId, recaptchaToken, tokenFromFrontend, action, minScore)
+// Create assessment service
+assessmentService := gorecaptcha.NewAssessmentService(option, projectId, captchaKey)
+// Create and validate assessment of given token, check if action is LOGIN and score is more than 0.4
+assessment, err := assessmentService.CreateAndValidateAssessment(context, token, "LOGIN", 0.4)
+```
+An err will be nil if all conditions in the `AssessmentService.ValidateAssessment()` function are met.
+
+### Create an option
+```go
+// With API key
+option := option.WithAPIKey(apiKey)
+// With Credentials.json (service credentials, etc.)
+option := option.WithCredentialsFile(fileName)
 ```
 
 ### Links to related documentation
